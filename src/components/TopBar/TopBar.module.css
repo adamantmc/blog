@@ -1,0 +1,28 @@
+.topbar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-links {
+    display: flex;
+    list-style: none;
+    padding-left: 0;
+}
+
+.nav-link-item:not(:last-child) {
+    padding-right: 2rem;
+}
+
+.nav-link-text {
+    color: #4c566a;
+    font-size: 1.4rem;
+}
+
+.site-title {
+    font-size: 3rem;
+    color: #ababab;
+    font-weight: 700;
+    margin-right: 3rem;
+}

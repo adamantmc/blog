@@ -16,7 +16,16 @@
   },
   "dependencies": {
     "gatsby": "^5.9.1",
+    "gatsby-omni-font-loader": "^2.0.2",
+    "gatsby-plugin-image": "^3.9.0",
+    "gatsby-plugin-mdx": "^5.9.0",
+    "gatsby-plugin-sharp": "^5.9.0",
+    "gatsby-remark-graph": "^0.2.6",
+    "gatsby-remark-mermaid": "^4.0.0",
+    "gatsby-source-filesystem": "^5.9.0",
+    "gatsby-transformer-remark": "^6.12.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-helmet": "^6.1.0"
   }
 }
