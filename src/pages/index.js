@@ -5,7 +5,7 @@ import PageTitle from '../components/PageTitle/PageTitle'
 
 const BlogPage = ({ data }) => {
   return (
-    <Layout pageTitle="Adam's blog">
+    <Layout pageTitle="adamantmc">
       {
         data.allMdx.nodes.map(node => (
           <article key={node.id}>

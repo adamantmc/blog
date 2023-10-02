@@ -1,8 +1,13 @@
 .topbar {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+}
+
+.topbar header {
+    margin: 0;
+    padding: 0;
 }
 
 .nav-links {
@@ -22,7 +27,7 @@
 
 .site-title {
     font-size: 3rem;
-    color: #ababab;
+    color: #4c566a;
     font-weight: 700;
     margin-right: 3rem;
 }

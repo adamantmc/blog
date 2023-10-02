@@ -21,7 +21,7 @@ const TopBar = ({ pageTitle, children }) => {
 
   return (
     <div className={topbar}>
-        {/* <header className={siteTitle}>{data.site.siteMetadata.title}</header> */}
+        <header className={siteTitle}>{data.site.siteMetadata.title}</header>
         <nav>
             <ul className={navLinks}>
             <li className={navLinkItem}>
