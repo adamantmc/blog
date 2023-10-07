@@ -163,28 +163,28 @@ Here's what was printed after running this script with Python3.11.
 Startup stats:
 
 ```
-# arenas allocated total           =                    2
-# arenas reclaimed                 =                    0
-# arenas highwater mark            =                    2
-# arenas allocated current         =                    2
+# arenas allocated total   = 2
+# arenas reclaimed         = 0
+# arenas highwater mark    = 2
+# arenas allocated current = 2
 ```
 
 1 million strings allocated stats:
 
 ```
-# arenas allocated total           =                   80
-# arenas reclaimed                 =                    0
-# arenas highwater mark            =                   80
-# arenas allocated current         =                   80
+# arenas allocated total   = 80
+# arenas reclaimed         = 0
+# arenas highwater mark    = 80
+# arenas allocated current = 80
 ```
 
-~500k strings allocated stats:
+~500k strings allocated stats (after removing ~500k strings randomly):
 
 ```
-# arenas allocated total           =                   80
-# arenas reclaimed                 =                    0
-# arenas highwater mark            =                   80
-# arenas allocated current         =                   80
+# arenas allocated total   = 80
+# arenas reclaimed         = 0
+# arenas highwater mark    = 80
+# arenas allocated current = 80
 ```
 
 No arenas have been reclaimed. That's expected - sampling in random would yield something close to picking the same amount of strings out of every arena, so we don't expect any of them to be empty.
@@ -192,10 +192,10 @@ No arenas have been reclaimed. That's expected - sampling in random would yield 
 And if we reduce `p` (probability with which we keep a string) to 0.00005, where we end up with 50 strings, we get the following allocation stats:
 
 ```
-# arenas allocated total           =                   79
-# arenas reclaimed                 =                   40
-# arenas highwater mark            =                   79
-# arenas allocated current         =                   39
+# arenas allocated total    = 79
+# arenas reclaimed          = 40
+# arenas highwater mark     = 79
+# arenas allocated current  = 39
 ```
 
 Again, since we're using random sampling to remove strings, it makes sense that most of the arenas won't be completely cleared. But some of the did clear indeed - it's the same effect as above, but since we've cleared so many more strings, we've probably ended up with arenas that have one or two strings in them.
@@ -203,10 +203,10 @@ Again, since we're using random sampling to remove strings, it makes sense that 
 On the other hand, if we just keep the first 500k strings (`strings = strings[:500000]`), we end up cleaning almost half of the arenas:
 
 ```
-# arenas allocated total           =                   79
-# arenas reclaimed                 =                   36
-# arenas highwater mark            =                   79
-# arenas allocated current         =                   43
+# arenas allocated total   = 79
+# arenas reclaimed         = 36
+# arenas highwater mark    = 79
+# arenas allocated current = 43
 ```
 
 Which is expected, as most probably the last-allocated arenas contain the last-generated strings. In other words, we're assuming that the first allocated Arena will contain the first X strings, while the last allocated Arena will contain the last X strings (where X is the number of strings that can fit in an Arena).
