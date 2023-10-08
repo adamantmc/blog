@@ -1,6 +1,6 @@
 <!DOCTYPE html><html><head><meta charSet="utf-8"/><meta http-equiv="x-ua-compatible" content="ie=edge"/><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/><meta name="generator" content="Gatsby 5.9.1"/><style data-href="/blog/styles.53bccea2d1ed99e1ef63.css" data-identity="gatsby-global-css">body{background-color:#e5e9f0;font-family:Open Sans;font-size:16px;min-height:100vh}.TopBar-module--topbar--b171c{align-items:center;display:flex;flex-direction:column;justify-content:center}.TopBar-module--topbar--b171c header{margin:0;padding:0}.TopBar-module--nav-links--830f7{display:flex;list-style:none;padding-left:0}.TopBar-module--nav-link-item--0b14f:not(:last-child){padding-right:2rem}.TopBar-module--nav-link-text--cd3dc{color:#4c566a;font-size:1.4rem}.TopBar-module--site-title--e2d2a{color:#4c566a;font-size:3rem;font-weight:700;margin-right:3rem}.Layout-module--container--172c3{margin:auto;padding:8px}@media (min-width:1025px){.Layout-module--container--172c3{max-width:70%}}@media (min-width:1281px){.Layout-module--container--172c3{max-width:50%}}.Layout-module--heading--f7cbe{color:#4c566a;font-size:2rem;text-align:center}.Layout-module--info--59324,.Layout-module--postBody--d5e0d{color:#434c5e}.Layout-module--postBody--d5e0d>pre{background-color:#d8dee9;border-radius:4px;overflow-x:auto;padding:1em}</style><style>.gatsby-image-wrapper{position:relative;overflow:hidden}.gatsby-image-wrapper picture.object-fit-polyfill{position:static!important}.gatsby-image-wrapper img{bottom:0;height:100%;left:0;margin:0;max-width:none;padding:0;position:absolute;right:0;top:0;width:100%;object-fit:cover}.gatsby-image-wrapper [data-main-image]{opacity:0;transform:translateZ(0);transition:opacity .25s linear;will-change:opacity}.gatsby-image-wrapper-constrained{display:inline-block;vertical-align:top}</style><noscript><style>.gatsby-image-wrapper noscript [data-main-image]{opacity:1!important}.gatsby-image-wrapper [data-placeholder-image]{opacity:0!important}</style></noscript><script type="module">const e="undefined"!=typeof HTMLImageElement&&"loading"in HTMLImageElement.prototype;e&&document.body.addEventListener("load",(function(e){const t=e.target;if(void 0===t.dataset.mainImage)return;if(void 0===t.dataset.gatsbyImageSsr)return;let a=null,n=t;for(;null===a&&n;)void 0!==n.parentNode.dataset.gatsbyImageWrapper&&(a=n.parentNode),n=n.parentNode;const o=a.querySelector("[data-placeholder-image]"),r=new Image;r.src=t.currentSrc,r.decode().catch((()=>{})).then((()=>{t.style.opacity=1,o&&(o.style.opacity=0,o.style.transition="opacity 500ms linear")}))}),!0);</script><link rel="preconnect" href="https://fonts.googleapis.com" crossorigin="true"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="true"/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&amp;display=swap"/><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&amp;display=swap"/><title data-gatsby-head="true">A primer on pymalloc | adamantmc</title></head><body><div id="___gatsby"><div style="outline:none" tabindex="-1" id="gatsby-focus-wrapper"><div class="Layout-module--container--172c3"><div class="TopBar-module--topbar--b171c"><header class="TopBar-module--site-title--e2d2a">adamantmc</header><nav><ul class="TopBar-module--nav-links--830f7"><li class="TopBar-module--nav-link-item--0b14f"><a class="TopBar-module--nav-link-text--cd3dc" href="/blog/">Home</a></li><li class="TopBar-module--nav-link-item--0b14f"><a class="TopBar-module--nav-link-text--cd3dc" href="/blog/about/">About</a></li></ul></nav></div><main><h1 class="Layout-module--heading--f7cbe">A primer on pymalloc</h1><p class="Layout-module--info--59324">September 30, 2023- 7 min read</p><div class="Layout-module--postBody--d5e0d"><h2>TL;DR</h2>
 <blockquote>
-<p>Python uses <code>pymalloc</code> for small (&lt; 512 bytes) objects. Pymalloc requests memory in chunks called Arenas, which are 256KB each. An Arena is only freed only if all objects that are allocated on it are deleted. So allocating 1.000.000 objects of 512 bytes, totalling 512MB and deleting half of them does not mean that half of the memory (256MB) will be freed and returned to the OS.</p>
+<p>Python uses <code>pymalloc</code> for small (&lt; 512 bytes) objects. Pymalloc requests memory in chunks called Arenas, which are 256KB each. An Arena is only freed only if all objects that are allocated on it are deleted. So allocating 1.000.000 objects of 512 bytes, totaling 512MB and deleting half of them does not mean that half of the memory (256MB) will be freed and returned to the OS.</p>
 </blockquote>
 <h1>Intro</h1>
 <p>Say you have a big tree. Suddenly you realize that some of the nodes can be pruned so as to reduce memory. You prune the nodes, but the memory usage remains largely the same, if not unaffected. What gives?</p>
@@ -21,13 +21,13 @@ for char in query:
     next_node = node.get_child(char)
 
     if next_node is None:
-        # if we can&#x27;t find the character, collect and return all words under node with a traversal (e.g. depth-first search)
+        # If we can&#x27;t find the character, collect and return all words under the current node with a traversal (e.g. depth-first search)
         return collect_words_under_node(node)
     else:
         # else just step over to the next node and continue the loop
         node = next_node
 </code></pre>
-<p>For <code>dan</code>, we would stop at node <code>n</code> and return the workds <code>dance</code>, <code>dancer</code> and <code>danger</code>. For a different query (e.g. <code>dab</code>), we can stop at node <code>a</code> and return
+<p>For <code>dan</code>, we would stop at node <code>n</code> and return the words <code>dance</code>, <code>dancer</code> and <code>danger</code>. For a different query (e.g. <code>dab</code>), we can stop at node <code>a</code> and return
 the words <code>dart</code>, <code>dance</code>, <code>dancer</code> and <code>danger</code> (or even return an error if we don&#x27;t want to allow searches using prefixes that are not in our tree).</p>
 <p>Now if we wanted to reduce the memory footprint of such a tree, we could try compressing the paths. There are certain nodes that are only part of paths and have no extra information. These can be bundled together, so as to avoid the memory overhead of each node.</p>
 <p>The initial idea was to do this as a <strong>post-processing step</strong>. So the tree is generated as above, and after it is generated, we:</p>
@@ -40,18 +40,18 @@ the words <code>dart</code>, <code>dance</code>, <code>dancer</code> and <code>d
 </ol>
 </li>
 </ol>
-<p>Compressing this tree would yield the following:</p>
+<p>Compressing the tree above would yield the following:</p>
 <pre><code>root ─ da ─ rt (dart)
         │
         └─ n ─ ce (dance)
            │    └─ r (dancer)
            └─ ger (danger)
 </code></pre>
-<p>In this case, we went from 11 nodes in the original tree down to 7 nodes. Not bad - we removed ~42% of the original nodes. But did the memory usage reduce?</p>
+<p>In this case, we went from 11 nodes in the original tree down to 7 nodes. Not bad - we removed ~42% of the original nodes. But did the memory usage also reduce by a proportional amount?</p>
 <h2>The problem</h2>
 <p>Well, no. That&#x27;s where Python&#x27;s <code>pymalloc</code> comes into play.</p>
 <p>Python uses its own memory allocator called <code>pymalloc</code> for small (&lt; 512 bytes) objects. It works by reserving chunks of 256KB of memory called Arenas, and fitting these small objects in those chunks <sup>[<a href="https://docs.python.org/3/c-api/memory.html#the-pymalloc-allocator">1</a>]</sup> (<em>oversimplification - Arenas are organized into pools which are organized into blocks, but for the sake of this post, we&#x27;ll consider an Arena to be just a chunk of memory</em>).</p>
-<p>The catch here is that an Arena is freed and given back to the OS only when it&#x27;s emptied completely. So even if we delete some these small object, we cannot be sure if their memory is given back to the OS, as we don&#x27;t know if we cleared an Arena.</p>
+<p>The catch here is that an Arena is freed and given back to the OS only when it&#x27;s emptied. So even if we delete some of these small objects, we cannot be sure if their memory is given back to the OS, as we don&#x27;t know if we cleared an Arena.</p>
 <p>Here&#x27;s an over-simplified example - let&#x27;s say we have 12 nodes, which made it into 3 Arenas, like so:</p>
 <pre><code>┌─────────┬─────────┬─────────┐
 │ Node 1  │ Node 6  │ Node 11 │
@@ -63,8 +63,8 @@ the words <code>dart</code>, <code>dance</code>, <code>dancer</code> and <code>d
 │ Arena 1 │ Arena 2 │ Arena 3 │
 └─────────┴─────────┴─────────┘
 </code></pre>
-<p>And let&#x27;s say that after compression, we&#x27;ve removed nodes 2, 3, 4, 7, 8, 11 and 12. We end up with the following memory allocation:</p>
-<pre><code>┌───────  ──┬─────────┬─────────┐
+<p>Let&#x27;s say that after compression, we&#x27;ve removed nodes 2, 3, 4, 7, 8, 11 and 12. We end up with the following memory allocation:</p>
+<pre><code>┌─────────┬─────────┬─────────┐
 │ Node 1  │ Node 6  │         │
 │         │         │         │
 │         │         │         │
@@ -88,14 +88,14 @@ the words <code>dart</code>, <code>dance</code>, <code>dancer</code> and <code>d
 <ol>
 <li>106 arenas have been allocated so far</li>
 <li>73 of them have been freed (reclaimed)</li>
-<li>106 arenas where used at any point in time</li>
+<li>106 arenas were used at any point in time</li>
 <li>33 arenas are used now</li>
 </ol>
 <p>Here&#x27;s a script that performs the following experiment:</p>
 <ol>
 <li>Print memory stats</li>
 <li>Store 1.000.000 strings and print memory stats</li>
-<li>Remove strings based on a probability and print memory stats</li>
+<li>Remove strings based on probability and print memory stats</li>
 </ol>
 <pre><code class="language-python">import random
 import sys
@@ -140,21 +140,21 @@ sys._debugmallocstats()
 # arenas highwater mark    = 80
 # arenas allocated current = 80
 </code></pre>
-<p>No arenas have been reclaimed. That&#x27;s expected - sampling in random would yield something close to picking the same amount of strings out of every arena, so we don&#x27;t expect any of them to be empty.</p>
+<p>No arenas have been reclaimed. That&#x27;s expected - sampling at random would yield something close to picking the same amount of strings out of every arena, so we don&#x27;t expect any of them to be empty.</p>
 <p>And if we reduce <code>p</code> (probability with which we keep a string) to 0.00005, where we end up with 50 strings, we get the following allocation stats:</p>
-<pre><code># arenas allocated total    = 79
-# arenas reclaimed          = 40
-# arenas highwater mark     = 79
+<pre><code># arenas allocated total    = 80
+# arenas reclaimed          = 41
+# arenas highwater mark     = 80
 # arenas allocated current  = 39
 </code></pre>
-<p>Again, since we&#x27;re using random sampling to remove strings, it makes sense that most of the arenas won&#x27;t be completely cleared. But some of the did clear indeed - it&#x27;s the same effect as above, but since we&#x27;ve cleared so many more strings, we&#x27;ve probably ended up with arenas that have one or two strings in them.</p>
+<p>Again, since we&#x27;re using random sampling to remove strings, it makes sense that most of the arenas won&#x27;t be emptied. Same behavior as above, but since we cleared many more strings, we do see a drop in currently allocated arenas.</p>
 <p>On the other hand, if we just keep the first 500k strings (<code>strings = strings[:500000]</code>), we end up cleaning almost half of the arenas:</p>
-<pre><code># arenas allocated total   = 79
-# arenas reclaimed         = 36
-# arenas highwater mark    = 79
+<pre><code># arenas allocated total   = 80
+# arenas reclaimed         = 37
+# arenas highwater mark    = 80
 # arenas allocated current = 43
 </code></pre>
-<p>Which is expected, as most probably the last-allocated arenas contain the last-generated strings. In other words, we&#x27;re assuming that the first allocated Arena will contain the first X strings, while the last allocated Arena will contain the last X strings (where X is the number of strings that can fit in an Arena).</p>
+<p>This is expected, as the last-allocated arenas most probably contain the last-generated strings. In other words, we&#x27;re assuming that the first allocated Arena will contain the first X strings, while the last allocated Arena will contain the last X strings (where X is the number of strings that can fit in an Arena).</p>
 <p>So deleting the last 500k strings means that we&#x27;re probably clearing whole arenas, as they were probably stored next to each other.</p>
 <h2>Is this a Python problem?</h2>
 <p>Well, pymalloc is a Python construct, but generally speaking, memory fragmentation is not something that happens only in Python. It&#x27;s something unavoidable, but manageable when you can control how memory is allocated. It&#x27;s the kind of problem that makes perfect sense as to why it happens, but you only think of it when you stumble upon it.</p>
@@ -169,6 +169,6 @@ sys._debugmallocstats()
           <script
             id="gatsby-chunk-mapping"
           >
-            window.___chunkMapping="{\"app\":[\"/app-823d557971ced4596aee.js\"],\"component---src-pages-404-js\":[\"/component---src-pages-404-js-d72c0e7ab86464795ded.js\"],\"component---src-pages-about-js\":[\"/component---src-pages-about-js-43336f4fa359186cdef2.js\"],\"component---src-pages-index-bak-js\":[\"/component---src-pages-index-bak-js-f5922e4ad4390aaad3c4.js\"],\"component---src-pages-index-js\":[\"/component---src-pages-index-js-d46f6b1d3ba09d9a28f2.js\"],\"component---src-pages-mdx-frontmatter-slug-js-content-file-path-blog-pymalloc-mdx\":[\"/component---src-pages-mdx-frontmatter-slug-js-content-file-path-blog-pymalloc-mdx-fbdfde7eb6e8128a0af7.js\"]}";
+            window.___chunkMapping="{\"app\":[\"/app-823d557971ced4596aee.js\"],\"component---src-pages-404-js\":[\"/component---src-pages-404-js-d72c0e7ab86464795ded.js\"],\"component---src-pages-about-js\":[\"/component---src-pages-about-js-43336f4fa359186cdef2.js\"],\"component---src-pages-index-bak-js\":[\"/component---src-pages-index-bak-js-f5922e4ad4390aaad3c4.js\"],\"component---src-pages-index-js\":[\"/component---src-pages-index-js-d46f6b1d3ba09d9a28f2.js\"],\"component---src-pages-mdx-frontmatter-slug-js-content-file-path-blog-pymalloc-mdx\":[\"/component---src-pages-mdx-frontmatter-slug-js-content-file-path-blog-pymalloc-mdx-78acacf3d84e32e64486.js\"]}";
           </script>
-        <script>window.___webpackCompilationHash="f99db752b1003e1bb7a6";</script><script src="/blog/webpack-runtime-6818e306982136885ff1.js" async></script><script src="/blog/framework-9649dcfd1ddbf692b0b9.js" async></script><script src="/blog/app-823d557971ced4596aee.js" async></script><!-- slice-end id="_gatsby-scripts-1" --></body></html>
+        <script>window.___webpackCompilationHash="8e643e814a0165605dc1";</script><script src="/blog/webpack-runtime-de56341d44f5f0d6fe86.js" async></script><script src="/blog/framework-9649dcfd1ddbf692b0b9.js" async></script><script src="/blog/app-823d557971ced4596aee.js" async></script><!-- slice-end id="_gatsby-scripts-1" --></body></html>
