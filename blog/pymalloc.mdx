@@ -6,7 +6,7 @@ slug: "primer-on-pymalloc"
 
 ## TL;DR
 
-> Python uses `pymalloc` for small (< 512 bytes) objects. Pymalloc requests memory in chunks called Arenas, which are 256KB each. An Arena is only freed only if all objects that are allocated on it are deleted. So allocating 1.000.000 objects of 512 bytes, totalling 512MB and deleting half of them does not mean that half of the memory (256MB) will be freed and returned to the OS.
+> Python uses `pymalloc` for small (< 512 bytes) objects. Pymalloc requests memory in chunks called Arenas, which are 256KB each. An Arena is only freed only if all objects that are allocated on it are deleted. So allocating 1.000.000 objects of 512 bytes, totaling 512MB and deleting half of them does not mean that half of the memory (256MB) will be freed and returned to the OS.
 
 # Intro
 
@@ -37,14 +37,14 @@ for char in query:
     next_node = node.get_child(char)
 
     if next_node is None:
-        # if we can't find the character, collect and return all words under node with a traversal (e.g. depth-first search)
+        # If we can't find the character, collect and return all words under the current node with a traversal (e.g. depth-first search)
         return collect_words_under_node(node)
     else:
         # else just step over to the next node and continue the loop
         node = next_node
 ```
 
-For `dan`, we would stop at node `n` and return the workds `dance`, `dancer` and `danger`. For a different query (e.g. `dab`), we can stop at node `a` and return
+For `dan`, we would stop at node `n` and return the words `dance`, `dancer` and `danger`. For a different query (e.g. `dab`), we can stop at node `a` and return
 the words `dart`, `dance`, `dancer` and `danger` (or even return an error if we don't want to allow searches using prefixes that are not in our tree).
 
 Now if we wanted to reduce the memory footprint of such a tree, we could try compressing the paths. There are certain nodes that are only part of paths and have no extra information. These can be bundled together, so as to avoid the memory overhead of each node.
@@ -56,7 +56,7 @@ The initial idea was to do this as a **post-processing step**. So the tree is ge
    1. If `a` has a single child named `b`, replace `a` and `b` with a single node `ab`
    2. Repeat for `ab`
 
-Compressing this tree would yield the following:
+Compressing the tree above would yield the following:
 
 ```
 root ─ da ─ rt (dart)
@@ -66,7 +66,7 @@ root ─ da ─ rt (dart)
            └─ ger (danger)
 ```
 
-In this case, we went from 11 nodes in the original tree down to 7 nodes. Not bad - we removed ~42% of the original nodes. But did the memory usage reduce?
+In this case, we went from 11 nodes in the original tree down to 7 nodes. Not bad - we removed ~42% of the original nodes. But did the memory usage also reduce by a proportional amount?
 
 ## The problem
 
@@ -74,7 +74,7 @@ Well, no. That's where Python's `pymalloc` comes into play.
 
 Python uses its own memory allocator called `pymalloc` for small (< 512 bytes) objects. It works by reserving chunks of 256KB of memory called Arenas, and fitting these small objects in those chunks <sup>[[1]]</sup> (_oversimplification - Arenas are organized into pools which are organized into blocks, but for the sake of this post, we'll consider an Arena to be just a chunk of memory_).
 
-The catch here is that an Arena is freed and given back to the OS only when it's emptied completely. So even if we delete some these small object, we cannot be sure if their memory is given back to the OS, as we don't know if we cleared an Arena.
+The catch here is that an Arena is freed and given back to the OS only when it's emptied. So even if we delete some of these small objects, we cannot be sure if their memory is given back to the OS, as we don't know if we cleared an Arena.
 
 Here's an over-simplified example - let's say we have 12 nodes, which made it into 3 Arenas, like so:
 
@@ -90,7 +90,7 @@ Here's an over-simplified example - let's say we have 12 nodes, which made it in
 └─────────┴─────────┴─────────┘
 ```
 
-And let's say that after compression, we've removed nodes 2, 3, 4, 7, 8, 11 and 12. We end up with the following memory allocation:
+Let's say that after compression, we've removed nodes 2, 3, 4, 7, 8, 11 and 12. We end up with the following memory allocation:
 
 ```
 ┌─────────┬─────────┬─────────┐
@@ -123,14 +123,14 @@ This tells us that:
 
 1. 106 arenas have been allocated so far
 2. 73 of them have been freed (reclaimed)
-3. 106 arenas where used at any point in time
+3. 106 arenas were used at any point in time
 4. 33 arenas are used now
 
 Here's a script that performs the following experiment:
 
 1. Print memory stats
 2. Store 1.000.000 strings and print memory stats
-3. Remove strings based on a probability and print memory stats
+3. Remove strings based on probability and print memory stats
 
 ```python
 import random
@@ -187,29 +187,29 @@ Startup stats:
 # arenas allocated current = 80
 ```
 
-No arenas have been reclaimed. That's expected - sampling in random would yield something close to picking the same amount of strings out of every arena, so we don't expect any of them to be empty.
+No arenas have been reclaimed. That's expected - sampling at random would yield something close to picking the same amount of strings out of every arena, so we don't expect any of them to be empty.
 
 And if we reduce `p` (probability with which we keep a string) to 0.00005, where we end up with 50 strings, we get the following allocation stats:
 
 ```
-# arenas allocated total    = 79
-# arenas reclaimed          = 40
-# arenas highwater mark     = 79
+# arenas allocated total    = 80
+# arenas reclaimed          = 41
+# arenas highwater mark     = 80
 # arenas allocated current  = 39
 ```
 
-Again, since we're using random sampling to remove strings, it makes sense that most of the arenas won't be completely cleared. But some of the did clear indeed - it's the same effect as above, but since we've cleared so many more strings, we've probably ended up with arenas that have one or two strings in them.
+Again, since we're using random sampling to remove strings, it makes sense that most of the arenas won't be emptied. Same behavior as above, but since we cleared many more strings, we do see a drop in currently allocated arenas.
 
 On the other hand, if we just keep the first 500k strings (`strings = strings[:500000]`), we end up cleaning almost half of the arenas:
 
 ```
-# arenas allocated total   = 79
-# arenas reclaimed         = 36
-# arenas highwater mark    = 79
+# arenas allocated total   = 80
+# arenas reclaimed         = 37
+# arenas highwater mark    = 80
 # arenas allocated current = 43
 ```
 
-Which is expected, as most probably the last-allocated arenas contain the last-generated strings. In other words, we're assuming that the first allocated Arena will contain the first X strings, while the last allocated Arena will contain the last X strings (where X is the number of strings that can fit in an Arena).
+This is expected, as the last-allocated arenas most probably contain the last-generated strings. In other words, we're assuming that the first allocated Arena will contain the first X strings, while the last allocated Arena will contain the last X strings (where X is the number of strings that can fit in an Arena).
 
 So deleting the last 500k strings means that we're probably clearing whole arenas, as they were probably stored next to each other.
 
