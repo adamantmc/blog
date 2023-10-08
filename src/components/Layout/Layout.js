@@ -10,7 +10,7 @@ import {
 const Layout = ({ postTitle, postDate, readingTime, children }) => {
   let infoText = postDate;
   if(readingTime !== undefined) {
-    infoText += `- ${readingTime} min read`
+    infoText += ` - ${readingTime} min read`
   }
 
   return (
