@@ -1,9 +1,5 @@
 import * as React from 'react'
-import {
-  postBody,
-  heading,
-  info
-} from './Post.module.css'
+import {PostTitle, PostInfo, PostDiv} from "./styles";
 
 const Post = ({ postTitle, postDate, readingTime, children }) => {
   let infoText = postDate;
@@ -13,11 +9,9 @@ const Post = ({ postTitle, postDate, readingTime, children }) => {
 
   return (
     <main>
-        <h1 className={heading}>{postTitle}</h1>
-        <p className={info}>{infoText}</p>
-        <div className={postBody}>
-            {children}
-        </div>
+        <PostTitle>{postTitle}</PostTitle>
+        <PostInfo>{infoText}</PostInfo>
+        <PostDiv>{children}</PostDiv>
     </main>
   )
 }

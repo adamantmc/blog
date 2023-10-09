@@ -1,12 +1,6 @@
 import * as React from 'react'
 import { Link, useStaticQuery, graphql } from 'gatsby'
-import {
-  topbar,
-  navLinks,
-  navLinkItem,
-  navLinkText,
-  siteTitle,
-} from './TopBar.module.css'
+import { SiteTitle, SiteTopBar, NavLinksList, NavLink } from './styles';
 
 const TopBar = ({ pageTitle, children }) => {
   const data = useStaticQuery(graphql`
@@ -20,23 +14,23 @@ const TopBar = ({ pageTitle, children }) => {
   `)
 
   return (
-    <div className={topbar}>
-        <header className={siteTitle}>{data.site.siteMetadata.title}</header>
+    <SiteTopBar>
+        <SiteTitle>{data.site.siteMetadata.title}</SiteTitle>
         <nav>
-            <ul className={navLinks}>
-            <li className={navLinkItem}>
-                <Link to="/" className={navLinkText}>
+            <NavLinksList>
+            <NavLink>
+                <Link to="/">
                     Home
                 </Link>
-            </li>
-            <li className={navLinkItem}>
-                <Link to="/about" className={navLinkText}>
+            </NavLink>
+            <NavLink>
+                <Link to="/about">
                     About
                 </Link>
-            </li>
-            </ul>
+            </NavLink>
+            </NavLinksList>
         </nav>
-    </div>
+    </SiteTopBar>
   )
 }
 

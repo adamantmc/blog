@@ -2,7 +2,8 @@ import * as React from 'react'
 import { graphql } from 'gatsby'
 import Layout from '../components/Layout/Layout'
 import PageTitle from '../components/PageTitle/PageTitle'
-
+import { ThemeProvider } from 'styled-components';
+import Themes from "../themes/themes";
 
 function calculateReadingTime(text) {
   // Poor man's word count
@@ -13,9 +14,11 @@ function calculateReadingTime(text) {
 
 const BlogPost = ({ data, children }) => {
   return (
-    <Layout postTitle={data.mdx.frontmatter.title} postDate={data.mdx.frontmatter.date} readingTime={calculateReadingTime(data.mdx.body)}>
+    <ThemeProvider theme={Themes.light}>
+      <Layout postTitle={data.mdx.frontmatter.title} postDate={data.mdx.frontmatter.date} readingTime={calculateReadingTime(data.mdx.body)}>
         {children}
-    </Layout>
+      </Layout>
+    </ThemeProvider>
   )
 }
 
