@@ -79,29 +79,29 @@ The catch here is that an Arena is freed and given back to the OS only when it's
 Here's an over-simplified example - let's say we have 12 nodes, which made it into 3 Arenas, like so:
 
 ```
-┌─────────┬─────────┬─────────┐
-│ Node 1  │ Node 6  │ Node 11 │
-│ Node 2  │ Node 7  │ Node 12 │
-│ Node 3  │ Node 8  │         │
-│ Node 4  │ Node 9  │         │
-│ Node 5  │ Node 10 │         │
-├─────────┼─────────┼─────────┤
-│ Arena 1 │ Arena 2 │ Arena 3 │
-└─────────┴─────────┴─────────┘
+|=========|=========|=========|
+| Node 1  | Node 6  | Node 11 |
+| Node 2  | Node 7  | Node 12 |
+| Node 3  | Node 8  |         |
+| Node 4  | Node 9  |         |
+| Node 5  | Node 10 |         |
+|---------|---------|---------|
+| Arena 1 | Arena 2 | Arena 3 |
+|=========|=========|=========|
 ```
 
 Let's say that after compression, we've removed nodes 2, 3, 4, 7, 8, 11 and 12. We end up with the following memory allocation:
 
 ```
-┌─────────┬─────────┬─────────┐
-│ Node 1  │ Node 6  │         │
-│         │         │         │
-│         │         │         │
-│         │ Node 9  │         │
-│ Node 5  │ Node 10 │         │
-├─────────┼─────────┼─────────┤
-│ Arena 1 │ Arena 2 │ Arena 3 │
-└─────────┴─────────┴─────────┘
+|=========|=========|=========|
+| Node 1  | Node 6  |         |
+|         |         |         |
+|         |         |         |
+|         | Node 9  |         |
+| Node 5  | Node 10 |         |
+|---------|---------|---------|
+| Arena 1 | Arena 2 | Arena 3 |
+|=========|=========|=========|
 ```
 
 In this example, we've removed 7 nodes out of 12, which is about 58%. We would naively expect that 58% of our memory is freed, but since only Arena 3 is emptied, we'll only see a 33% decrease in memory usage. If a single node was left in Arena 3, we would see no difference in memory usage.
