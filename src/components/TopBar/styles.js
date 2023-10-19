@@ -2,7 +2,7 @@ import styled from "styled-components";
 
 export const SiteTitle = styled.header`
     font-size: 3rem;
-    color: #4c566a;
+    color: ${props => props.theme.headerColor};
     font-weight: 700;
     margin-right: 3rem;
 `;
@@ -27,7 +27,7 @@ export const NavLinksList = styled.ul`
 
 export const NavLink = styled.li`
     a {
-        color: #4c566a;
+        color: ${props => props.theme.navLinkColor};
     }
     
     font-size: 1.4rem;
