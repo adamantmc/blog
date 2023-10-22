@@ -1,6 +1,7 @@
 const DarkTheme = {
     headerColor: "#DCDFE4",
     navLinkColor: "#DCDFE4",
+    linkColor: "#D0D3D8",
     backgroundColor: "#434c5e",
     post: {
         titleColor: "#DCDFE4",

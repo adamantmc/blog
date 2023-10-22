@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { Link, useStaticQuery, graphql } from 'gatsby'
 import { SiteTitle, SiteTopBar, NavLinksList, NavLink } from './styles';
+import ThemeSwitcher from '../ThemeSwitcher/ThemeSwitcher';
+
 
 const TopBar = ({ pageTitle, children }) => {
   const data = useStaticQuery(graphql`
@@ -30,6 +32,7 @@ const TopBar = ({ pageTitle, children }) => {
             </NavLink>
             </NavLinksList>
         </nav>
+        <ThemeSwitcher />
     </SiteTopBar>
   )
 }

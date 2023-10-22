@@ -2,9 +2,7 @@ import * as React from 'react'
 import { graphql } from 'gatsby'
 import Layout from '../components/Layout/Layout'
 import PageTitle from '../components/PageTitle/PageTitle'
-import { ThemeProvider } from 'styled-components';
-import Themes from "../themes/themes";
-import GlobalStyle from "../global";
+import Page from "../page";
 
 
 function calculateReadingTime(text) {
@@ -15,13 +13,12 @@ function calculateReadingTime(text) {
 }
 
 const BlogPost = ({ data, children }) => {
-  return (
-    <ThemeProvider theme={Themes.light}>
-      <GlobalStyle />
-      <Layout postTitle={data.mdx.frontmatter.title} postDate={data.mdx.frontmatter.date} readingTime={calculateReadingTime(data.mdx.body)}>
-        {children}
-      </Layout>
-    </ThemeProvider>
+    return (
+        <Page>
+            <Layout postTitle={data.mdx.frontmatter.title} postDate={data.mdx.frontmatter.date} readingTime={calculateReadingTime(data.mdx.body)}>
+                {children}
+            </Layout>
+        </Page>
   )
 }
 

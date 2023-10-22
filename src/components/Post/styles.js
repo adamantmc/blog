@@ -19,4 +19,8 @@ export const PostDiv = styled.div`
         border-radius: 4px;
         overflow-x: auto;
     }
+
+    a {
+        color: ${props => props.theme.linkColor};
+    }
 `;

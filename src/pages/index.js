@@ -2,10 +2,8 @@ import * as React from 'react'
 import { Link, graphql } from 'gatsby'
 import Layout from '../components/Layout/Layout'
 import PageTitle from '../components/PageTitle/PageTitle'
-import { ThemeProvider } from 'styled-components';
-import Themes from "../themes/themes";
-import GlobalStyle from "../global";
 import styled from "styled-components";
+import Page from "../page";
 
 
 const StyledLink = styled(Link)`
@@ -15,8 +13,7 @@ const StyledLink = styled(Link)`
 
 const BlogPage = ({ data }) => {
   return (
-    <ThemeProvider theme={Themes.light}>
-      <GlobalStyle />
+    <Page>
       <Layout pageTitle="adamantmc">
         {
           data.allMdx.nodes.map(node => (
@@ -31,7 +28,7 @@ const BlogPage = ({ data }) => {
           ))
         }
       </Layout>
-    </ThemeProvider>
+    </Page>
   )
 }
 
