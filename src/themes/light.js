@@ -3,6 +3,7 @@ const LightTheme = {
     navLinkColor: "#4c566a",
     linkColor: "#4c566a",
     backgroundColor: "#e5e9f0",
+    buttonBackgroundOnHover: "#cccccc",
     post: {
         titleColor: "#4c566a",
         textColor: "#434c5e",

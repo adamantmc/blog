@@ -12,8 +12,8 @@ const StyledButton = styled.button`
     
     :hover {
         border-radius: 4em;
-        border-color: #cccccc;
-        background-color: #cccccc;
+        border-color: ${props => props.theme.buttonBackgroundOnHover};
+        background-color: ${props => props.theme.buttonBackgroundOnHover};
     }
 
     svg {

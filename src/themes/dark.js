@@ -3,6 +3,7 @@ const DarkTheme = {
     navLinkColor: "#DCDFE4",
     linkColor: "#D0D3D8",
     backgroundColor: "#434c5e",
+    buttonBackgroundOnHover: "#666666",
     post: {
         titleColor: "#DCDFE4",
         textColor: "#e5e9f0",
