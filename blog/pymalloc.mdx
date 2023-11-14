@@ -37,7 +37,8 @@ for char in query:
     next_node = node.get_child(char)
 
     if next_node is None:
-        # If we can't find the character, collect and return all words under the current node with a traversal (e.g. depth-first search)
+        # If we can't find the character, collect and return all words 
+        # under the current node with a traversal (e.g. depth-first search)
         return collect_words_under_node(node)
     else:
         # else just step over to the next node and continue the loop

@@ -12,12 +12,34 @@ export const PostInfo = styled.p`
 
 export const PostDiv = styled.div`
     color: ${props => props.theme.post.textColor};
-    
+
     pre {
-        background-color: ${props => props.theme.post.pre.backgroundColor};
-        padding: 1em;
+        background-color: ${props => props.theme.post.pre.backgroundColor} !important;
         border-radius: 4px;
         overflow-x: auto;
+
+        /* width */
+        code::-webkit-scrollbar {
+            width: 100%;
+        }
+        
+        /* Track */
+        code::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0);
+        }
+        
+        /* Handle */
+        code::-webkit-scrollbar-thumb {
+            background: #383C44;
+            border-radius: 1em;
+            border: 3px solid #282C34;
+        }
+        
+        /* Handle on hover */
+        code::-webkit-scrollbar-thumb:hover {
+            background: #484C54;
+        }
+          
     }
 
     a {

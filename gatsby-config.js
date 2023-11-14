@@ -9,7 +9,17 @@ module.exports = {
   plugins: [
     "gatsby-plugin-image",
     "gatsby-plugin-sharp",
-    "gatsby-plugin-mdx",
+    {
+      resolve: 'gatsby-plugin-mdx',
+      options: {
+        gatsbyRemarkPlugins: [
+          {
+            resolve: 'gatsby-remark-mermaid',
+          },
+        ],
+        extensions: [".mdx", ".md"]
+      }
+    },
     {
       resolve: "gatsby-source-filesystem",
       options: {
@@ -34,21 +44,5 @@ module.exports = {
         ],
       },
     },
-    {
-      resolve: 'gatsby-transformer-remark',
-      options: {
-        plugins: [
-          {
-            resolve: `gatsby-remark-mermaid`,
-            options: /** @type {import('gatsby-remark-mermaid').Options} */ ({
-              mermaidConfig: {
-                theme: 'neutral',
-                themeCSS: '.node rect { fill: #fff; }'
-              }
-            })
-          }
-        ]
-      }
-    }
   ],
 };
