@@ -6,7 +6,6 @@ import isBrowser from './utils';
 
 const Page = ({children}) => {
   const [theme, setTheme] = useState(getCurrentTheme());
-  console.log(theme);
 
   useEffect(() => {
     function updateTheme() {
