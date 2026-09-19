@@ -1,0 +1,197 @@
+---
+import '@fontsource-variable/inter';
+import '@fontsource-variable/jetbrains-mono';
+import '../styles/global.css';
+import ThemeToggle from '../components/ThemeToggle.astro';
+import { SITE, url } from '../lib/site';
+
+interface Props {
+  title?: string;
+  description?: string;
+  type?: 'website' | 'article';
+}
+
+const { title, description = SITE.description, type = 'website' } = Astro.props;
+const fullTitle = title ? `${title} · ${SITE.title}` : SITE.title;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const path = Astro.url.pathname.replace(/\/$/, '');
+
+const nav = [
+  { href: url('/'), label: 'Writing' },
+  { href: url('/about'), label: 'About' },
+];
+const isActive = (href: string) => {
+  const target = href.replace(/\/$/, '');
+  return target === url('/').replace(/\/$/, '') ? path === target : path.startsWith(target);
+};
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
+    <link rel="alternate" type="application/rss+xml" title={SITE.title} href={url('/rss.xml')} />
+    <link rel="sitemap" href={url('/sitemap-index.xml')} />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0c0d0f" />
+
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={title ?? SITE.title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+
+    <!-- Runs before paint to avoid a flash of the wrong theme. Dark unless the reader chose light. -->
+    <script is:inline>
+      try {
+        if (localStorage.getItem('theme') === 'light') {
+          document.documentElement.dataset.theme = 'light';
+          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#fbfbfa');
+        }
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <div class="shell">
+      <header class="site-header">
+        <a class="brand" href={url('/')} aria-label={`${SITE.title} home`}>
+          <span class="brand-mark" aria-hidden="true"></span>
+          {SITE.title}
+        </a>
+        <nav aria-label="Main">
+          {nav.map((item) => (
+            <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>{item.label}</a>
+          ))}
+          <ThemeToggle />
+        </nav>
+      </header>
+
+      <main id="content">
+        <slot />
+      </main>
+
+      <footer class="site-footer">
+        <span>© {new Date().getFullYear()} {SITE.title}</span>
+        <span class="footer-links">
+          <a href={SITE.github}>GitHub</a>
+          <a href={url('/rss.xml')}>RSS</a>
+          <a href={SITE.repo}>Source</a>
+        </span>
+      </footer>
+    </div>
+  </body>
+</html>
+
+<style>
+  .shell {
+    max-width: var(--measure);
+    min-height: 100dvh;
+    margin: 0 auto;
+    padding: 0 1.25rem;
+    display: flex;
+    flex-direction: column;
+  }
+  main {
+    flex: 1;
+    padding-block: clamp(2.5rem, 8vw, 5rem) 4rem;
+  }
+
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 1.75rem;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .brand-mark {
+    width: 0.6rem;
+    height: 0.6rem;
+    background: var(--accent);
+    transform: rotate(45deg);
+    border-radius: 2px;
+    box-shadow: 0 0 14px var(--accent-glow);
+    transition: transform 0.4s ease;
+  }
+  .brand:hover .brand-mark {
+    transform: rotate(225deg);
+  }
+
+  nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  nav a {
+    padding: 0.4rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s, background-color 0.2s;
+  }
+  nav a:hover {
+    color: var(--text);
+  }
+  nav a[aria-current='page'] {
+    color: var(--text);
+    background: var(--surface);
+  }
+  nav :global(.theme-toggle) {
+    margin-left: 0.5rem;
+  }
+
+  .site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-block: 2rem 2.5rem;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-faint);
+  }
+  .footer-links {
+    display: flex;
+    gap: 1.25rem;
+  }
+  .footer-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .footer-links a:hover {
+    color: var(--accent);
+  }
+
+  .skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -3rem;
+    padding: 0.5rem 0.8rem;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 6px;
+    z-index: 10;
+  }
+  .skip-link:focus {
+    top: 1rem;
+  }
+</style>

@@ -1,0 +1,22 @@
+---
+// Layout for standalone Markdown/MDX pages in src/pages (e.g. about.mdx).
+import Base from './Base.astro';
+
+const { frontmatter } = Astro.props;
+---
+
+<Base title={frontmatter.title} description={frontmatter.description}>
+  <h1>{frontmatter.title}</h1>
+  <div class="prose">
+    <slot />
+  </div>
+</Base>
+
+<style>
+  h1 {
+    margin: 0 0 2rem;
+    font-size: clamp(2rem, 6vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+  }
+</style>

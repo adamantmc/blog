@@ -1,0 +1,95 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE, url, getPosts, formatDate, readingTime } from '../lib/site';
+
+const posts = await getPosts();
+---
+
+<Base>
+  <section class="intro">
+    <h1>Hi, I'm {SITE.author}.</h1>
+    <p>
+      I'm a software engineer. This is where I write about interesting things I run into while building
+      software.
+    </p>
+  </section>
+
+  <section aria-labelledby="writing">
+    <h2 id="writing" class="eyebrow">Writing</h2>
+    <ul class="posts">
+      {posts.map((post) => (
+        <li>
+          <a href={url(`/${post.id}/`)}>
+            <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date, 'short')}</time>
+            <span class="title">{post.data.title}</span>
+            <span class="meta">{readingTime(post.body)} min</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+</Base>
+
+<style>
+  .intro {
+    margin-bottom: clamp(3rem, 10vw, 5rem);
+  }
+  h1 {
+    margin: 0 0 1rem;
+    font-size: clamp(2rem, 6vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+  }
+  .intro p {
+    max-width: 34rem;
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-muted);
+  }
+
+  .posts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+  .posts a {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr auto;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 1.1rem 0.25rem;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    transition: padding 0.25s ease, background-color 0.25s;
+  }
+  .posts a:hover {
+    padding-inline: 0.9rem;
+    background: var(--surface);
+  }
+  time,
+  .meta {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  .title {
+    font-weight: 550;
+    color: var(--text);
+    transition: color 0.2s;
+  }
+  .posts a:hover .title {
+    color: var(--accent);
+  }
+
+  @media (max-width: 34rem) {
+    .posts a {
+      grid-template-columns: 1fr auto;
+      gap: 0.35rem 1rem;
+    }
+    time {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

@@ -1,0 +1,32 @@
+---
+// Renders ```mermaid code blocks client-side. Mermaid is only downloaded on pages that contain a diagram.
+---
+<script>
+  const blocks = [
+    ...document.querySelectorAll<HTMLElement>('pre.mermaid, pre:has(> code.language-mermaid), pre[data-language="mermaid"]'),
+  ];
+
+  if (blocks.length) {
+    const diagrams = blocks.map((pre) => {
+      const container = document.createElement('div');
+      container.className = 'mermaid-diagram';
+      container.dataset.source = pre.textContent ?? '';
+      pre.replaceWith(container);
+      return container;
+    });
+
+    const { default: mermaid } = await import('mermaid');
+
+    const render = async () => {
+      const dark = document.documentElement.dataset.theme !== 'light';
+      mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'neutral', fontFamily: 'inherit' });
+      for (const [i, el] of diagrams.entries()) {
+        const { svg } = await mermaid.render(`mermaid-${i}-${Date.now()}`, el.dataset.source ?? '');
+        el.innerHTML = svg;
+      }
+    };
+
+    await render();
+    window.addEventListener('themechange', render);
+  }
+</script>

@@ -1,0 +1,300 @@
+/* ---------- Tokens ---------- */
+:root {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --measure: 44rem;
+
+  /* Dark (default) */
+  --bg: #0c0d0f;
+  --surface: #16181b;
+  --surface-2: #1c1f23;
+  --border: #25282d;
+  --text: #e8e9eb;
+  --text-muted: #9ba1a9;
+  --text-faint: #636a73;
+  --accent: #5eead4;
+  --accent-glow: rgb(94 234 212 / 0.35);
+  --accent-soft: rgb(94 234 212 / 0.1);
+  --selection: rgb(94 234 212 / 0.25);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #fbfbfa;
+  --surface: #f1f1ef;
+  --surface-2: #f6f6f4;
+  --border: #e4e4e0;
+  --text: #17191c;
+  --text-muted: #555b63;
+  --text-faint: #8b9098;
+  --accent: #0f766e;
+  --accent-glow: rgb(15 118 110 / 0.25);
+  --accent-soft: rgb(15 118 110 / 0.08);
+  --selection: rgb(15 118 110 / 0.18);
+  color-scheme: light;
+}
+
+/* ---------- Base ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scrollbar-gutter: stable;
+  scrollbar-color: var(--border) transparent;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.7;
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ---------- Shared bits ---------- */
+.eyebrow {
+  margin: 0 0 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
+
+/* ---------- Long-form content ---------- */
+.prose {
+  font-size: 1.0625rem;
+  color: var(--text);
+}
+.prose :where(p, ul, ol, blockquote, pre, table, figure) {
+  margin-block: 0;
+}
+.prose > * + * {
+  margin-top: 1.25em;
+}
+
+.prose h2 {
+  margin-top: 2.75em;
+  font-size: 1.45rem;
+  font-weight: 650;
+}
+.prose h3 {
+  margin-top: 2.25em;
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+.prose h4 {
+  margin-top: 1.75em;
+  font-size: 1rem;
+  font-weight: 650;
+}
+.prose h2 + *,
+.prose h3 + *,
+.prose h4 + * {
+  margin-top: 0.75em;
+}
+.prose :is(h2, h3, h4) {
+  scroll-margin-top: 2rem;
+}
+
+.prose a {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color 0.15s, text-decoration-thickness 0.15s;
+}
+.prose a:hover {
+  color: var(--accent);
+  text-decoration-thickness: 2px;
+}
+
+.prose strong {
+  font-weight: 650;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.4em;
+}
+.prose li + li,
+.prose li > ol,
+.prose li > ul {
+  margin-top: 0.4em;
+}
+.prose li::marker {
+  color: var(--text-faint);
+}
+.prose ol > li::marker {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.prose blockquote {
+  margin-inline: 0;
+  padding: 1.1rem 1.35rem;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.prose blockquote > :first-child {
+  margin-top: 0;
+}
+.prose blockquote > * + * {
+  margin-top: 0.75em;
+}
+
+.prose hr {
+  margin-block: 3em;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+  display: block;
+  overflow-x: auto;
+}
+.prose th,
+.prose td {
+  padding: 0.55em 0.8em;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.prose th {
+  font-weight: 600;
+}
+
+/* Inline code */
+.prose :not(pre) > code {
+  padding: 0.15em 0.4em;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+/* Code blocks (Shiki, dual themes via CSS variables) */
+.prose pre {
+  position: relative;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2) !important;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.65;
+  overflow-x: auto;
+  tab-size: 4;
+}
+.prose pre code {
+  font-family: inherit;
+}
+.astro-code,
+.astro-code span {
+  color: var(--shiki-dark);
+  font-style: var(--shiki-dark-font-style);
+  font-weight: var(--shiki-dark-font-weight);
+  text-decoration: var(--shiki-dark-text-decoration);
+}
+[data-theme='light'] .astro-code,
+[data-theme='light'] .astro-code span {
+  color: var(--shiki-light);
+  font-style: var(--shiki-light-font-style);
+  font-weight: var(--shiki-light-font-weight);
+  text-decoration: var(--shiki-light-text-decoration);
+}
+
+/* Footnotes (GFM) */
+.prose sup a,
+.prose .data-footnote-backref {
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--accent);
+}
+.prose .footnotes {
+  margin-top: 3.5em;
+  padding-top: 1.5em;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.prose .footnotes h2 {
+  margin: 0 0 0.75em;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
+
+.prose .mermaid-diagram {
+  display: flex;
+  justify-content: center;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  overflow-x: auto;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
