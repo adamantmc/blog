@@ -63,9 +63,12 @@ const posts = await getPosts();
     text-decoration: none;
     transition: padding 0.25s ease, background-color 0.25s;
   }
-  .posts a:hover {
-    padding-inline: 0.9rem;
-    background: var(--surface);
+  /* The slide-in only makes sense with a pointer; taps shouldn't shift the row. */
+  @media (hover: hover) {
+    .posts a:hover {
+      padding-inline: 0.9rem;
+      background: var(--surface);
+    }
   }
   time,
   .meta {
@@ -87,9 +90,14 @@ const posts = await getPosts();
     .posts a {
       grid-template-columns: 1fr auto;
       gap: 0.35rem 1rem;
+      padding-block: 0.95rem;
     }
     time {
       grid-column: 1 / -1;
+      order: -1;
+    }
+    .intro p {
+      font-size: 1.05rem;
     }
   }
 </style>

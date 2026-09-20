@@ -1,0 +1,241 @@
+---
+// Table of contents built from the post's markdown headings.
+// Renders twice: a fixed rail beside the article on wide screens, and a
+// collapsible panel inline above the content on narrow ones.
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+  headings: MarkdownHeading[];
+  /** Deepest heading level to list. */
+  maxDepth?: number;
+}
+
+const { headings, maxDepth = 3 } = Astro.props;
+const items = headings.filter((h) => h.depth >= 2 && h.depth <= maxDepth && h.slug);
+---
+
+{items.length > 1 && (
+  <>
+    <aside class="toc-rail">
+      <p class="toc-title" id="toc-heading">On this page</p>
+      <nav class="toc-nav" aria-labelledby="toc-heading" data-toc>
+        <ul>
+          {items.map((item) => (
+            <li data-depth={item.depth}>
+              <a href={`#${item.slug}`} data-toc-link={item.slug}>{item.text}</a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </aside>
+
+    <details class="toc-inline" data-toc-inline>
+      <summary>
+        <span class="toc-title">On this page</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </summary>
+      <nav class="toc-nav" aria-label="On this page" data-toc>
+        <ul>
+          {items.map((item) => (
+            <li data-depth={item.depth}>
+              <a href={`#${item.slug}`} data-toc-link={item.slug}>{item.text}</a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </details>
+  </>
+)}
+
+<script>
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('[data-toc] a[data-toc-link]')];
+
+  if (links.length) {
+    const slugs = [...new Set(links.map((a) => a.dataset.tocLink!))];
+    const targets = slugs
+      .map((slug) => document.getElementById(slug))
+      .filter((el): el is HTMLElement => el !== null);
+
+    const rail = document.querySelector<HTMLElement>('.toc-rail .toc-nav');
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let active = '';
+
+    const setActive = (slug: string) => {
+      if (slug === active) return;
+      active = slug;
+      for (const link of links) {
+        link.toggleAttribute('data-active', link.dataset.tocLink === slug);
+      }
+      // Keep the current entry visible when the rail itself has to scroll.
+      const current = rail?.querySelector<HTMLElement>('a[data-active]');
+      if (rail && current && rail.scrollHeight > rail.clientHeight) {
+        const offset = current.offsetTop - rail.clientHeight / 2 + current.offsetHeight / 2;
+        rail.scrollTo({ top: offset, behavior: calm.matches ? 'auto' : 'smooth' });
+      }
+    };
+
+    // The heading nearest the top of the viewport wins; at the very bottom of
+    // the page the last one does, since short trailing sections never reach it.
+    const update = () => {
+      const atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 2;
+      if (atBottom) return setActive(targets[targets.length - 1].id);
+
+      let current = targets[0];
+      for (const el of targets) {
+        if (el.getBoundingClientRect().top <= 120) current = el;
+      }
+      setActive(current.id);
+    };
+
+    let queued = false;
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        update();
+      });
+    };
+
+    if (targets.length) {
+      update();
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+    }
+
+    // Collapse the inline panel once the reader has picked a section.
+    const inline = document.querySelector<HTMLDetailsElement>('[data-toc-inline]');
+    inline?.addEventListener('click', (event) => {
+      if ((event.target as HTMLElement).closest('a')) inline.open = false;
+    });
+  }
+</script>
+
+<style>
+  .toc-title {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  .toc-nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-left: 1px solid var(--border);
+  }
+  .toc-nav li[data-depth='3'] a {
+    padding-left: 1.75rem;
+    font-size: 0.82rem;
+  }
+  .toc-nav a {
+    display: block;
+    position: relative;
+    padding: 0.3rem 0.5rem 0.3rem 0.9rem;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--text-faint);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .toc-nav a::before {
+    content: '';
+    position: absolute;
+    left: -1px;
+    top: 0.35rem;
+    bottom: 0.35rem;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .toc-nav a:hover {
+    color: var(--text);
+  }
+  .toc-nav a[data-active] {
+    color: var(--accent);
+  }
+  .toc-nav a[data-active]::before {
+    opacity: 1;
+  }
+
+  /* ---- Wide screens: a rail pinned beside the article column ---- */
+  .toc-rail {
+    display: none;
+    position: fixed;
+    top: 8.5rem;
+    /* The article column is var(--measure) wide and centred, so the rail hangs
+       off its left edge. `left` + `margin-left: auto` keep it from running off
+       the viewport on narrower windows -- it narrows instead. */
+    right: calc(50% + var(--measure) / 2 + 1.5rem);
+    left: 1.25rem;
+    max-width: 14rem;
+    margin-left: auto;
+    max-height: calc(100dvh - 11rem);
+  }
+  .toc-rail .toc-nav {
+    position: relative;
+    margin-top: 0.85rem;
+    max-height: calc(100dvh - 14rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* ---- Narrow screens: a collapsed panel above the article ---- */
+  .toc-inline {
+    margin-bottom: 2.5rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+  .toc-inline summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  .toc-inline summary::-webkit-details-marker {
+    display: none;
+  }
+  .toc-inline summary svg {
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+    fill: none;
+    stroke: var(--text-faint);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.25s ease;
+  }
+  .toc-inline[open] summary svg {
+    transform: rotate(180deg);
+  }
+  .toc-inline .toc-nav {
+    padding: 0.25rem 1rem 1rem;
+  }
+  .toc-inline .toc-nav a {
+    /* Comfortable tap targets on touch screens. */
+    padding-block: 0.5rem;
+  }
+
+  @media (min-width: 76rem) {
+    .toc-rail {
+      display: block;
+    }
+    .toc-inline {
+      display: none;
+    }
+  }
+</style>

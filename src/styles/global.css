@@ -110,6 +110,7 @@ svg {
 .prose {
   font-size: 1.0625rem;
   color: var(--text);
+  overflow-wrap: break-word;
 }
 .prose :where(p, ul, ol, blockquote, pre, table, figure) {
   margin-block: 0;
@@ -204,6 +205,7 @@ svg {
   font-size: 0.95em;
   display: block;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 .prose th,
 .prose td {
@@ -213,11 +215,14 @@ svg {
 }
 .prose th {
   font-weight: 600;
+  /* Headers stay on one line; the table scrolls instead of stacking letters. */
+  white-space: nowrap;
 }
 
 /* Inline code */
 .prose :not(pre) > code {
   padding: 0.15em 0.4em;
+  overflow-wrap: anywhere;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -297,4 +302,44 @@ svg {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* ---------- Phones ---------- */
+@media (max-width: 40rem) {
+  body {
+    line-height: 1.65;
+  }
+
+  .prose {
+    font-size: 1rem;
+  }
+  .prose h2 {
+    margin-top: 2.25em;
+    font-size: 1.3rem;
+  }
+  .prose h3 {
+    margin-top: 2em;
+    font-size: 1.08rem;
+  }
+  .prose ul,
+  .prose ol {
+    padding-left: 1.15em;
+  }
+  .prose pre {
+    padding: 0.9rem 1rem;
+    border-radius: 10px;
+    font-size: 0.78rem;
+  }
+  .prose blockquote {
+    padding: 0.9rem 1.05rem;
+  }
+  .prose hr {
+    margin-block: 2.25em;
+  }
+  .prose .mermaid-diagram {
+    padding: 0.85rem;
+  }
+  .prose .footnotes {
+    margin-top: 2.5em;
+  }
 }
