@@ -1,0 +1,478 @@
+---
+title: "Leveraging SIMD instructions in Rust"
+description: "Gotta go fast - an intro to SIMD instructions in Rust"
+date: "2026-09-19"
+---
+
+## Intro
+
+I've been writing my own HNSW implementation in Rust. HNSW is the go-to approximate nearest-neighbours algorithm in Semantic Search engines, and I wanted to get a better understanding of its inner workings. Similarly, Rust is a very intriguing language which I tried to pick up a couple of times; but I wanted to get some solid intuition on its mechanisms. 
+
+While chasing performance boosts in an attempt to speed up my implementation, SIMD came up - so in this post, we will get a basic understanding of what SIMD is, and how we can leverage it in Rust, either using intrinsics (functions that directly translate to SIMD operations) or by relying on the compiler to optimize our code with SIMD instructions automatically.
+
+More specifically, we will take a very brief look at HNSW, then implement the L2 distance calculation using SIMD instructions. We will start with a naive hand-rolled implementation, then focus on what we can do to have the compiler use SIMD for us, then return back to our implementation and try to optimize it. 
+
+## HNSW
+
+The HNSW algorithm builds a multi-layered graph of vectors. Edges are added between vectors that are "close" to each other, "close" here being defined as close in Euclidean space (L2 distance), or similar (cosine similarity).
+
+For the rest of this post, we'll use "distance" as the term that defines closeness between two vectors.
+
+### The algorithm
+
+At both query and insert time, lots of distance calculations take place. 
+
+#### Searching
+
+At query time, given a query vector `Q`, we start from the top-most layer from an existing vector called `entrypoint` (usually, the first vector that arrived at the top-most layer). We keep two heaps of vectors - the `candidates`, and the `results`. The entrypoint is added to both, and then the algorithm goes like this:
+
+1. Remove closest-to-query `Q` candidate `C` from candidate heap
+2. For each neighbour `N` to the candidate `C`:
+    1. If already visited, continue to the next neighbour
+    2. Add `N` to visited set
+    3. Calculate the distance of the query vector to N
+    4. If `N` is closer to `Q` than the farthest result (or if we have fewer than `ef_search` results so far), add it to the candidate and result heaps
+
+The search stops when the closest candidate `C` to query `Q` is farther than the farthest result. 
+
+The `ef_search` parameter essentially controls both how many results we get back, and how many candidates we consider. During HNSW search, we start from the top-most layer, then descend down to layer 0 with `ef_search=1`, and the entrypoint for each next layer is the result we got from the previous one.
+
+When we reach layer 0, we set `ef_search` to whatever the user has provided (a typical value is 32), and run the same algorithm. This outputs a list of results, which are the closest vectors to our query `Q`.
+
+
+#### Inserting
+
+When inserting a vector `Q`, we first pick the layer it will go to. The number of layers is not predefined (at least not in the algorithm defined in the [paper](https://arxiv.org/abs/1603.09320)). The layer that each vector goes to is drawn from an exponential distribution, which favors numbers close to 0. 
+
+If a vector is inserted at layer L, it will exist in all layers between 0 and L, but not in any layers above. 
+
+So, say we have picked layer 3, and the graph so far has 5 layers. The insertion algorithm will:
+
+1. Descend from 4 (zero-indexed, top layer) to 3 (landing layer) by searching with `ef_search=1` with the same search method we saw above, to get the next entrypoint layer-by-layer 
+2. From layer 3 until 0, follow again the same search algorithm but this time with `ef_search` set to the `ef_construction` parameter (again provided by the user; a typical value is in the range of 100-200)
+3. Before going to each next layer, add up to `M` (again, parameter, up to typically `2*M` in layer 0) edges to the query vector `Q` - the vectors we're adding edges with can be simply the closest results from our search, or we can alternatively use a heuristic described in the paper
+
+
+## Speeding up distance calculations
+
+Point being, there are lots of distance calculations that take place. Getting the 100 closest neighbours for a given query yields thousands of distance calculations. So, in order to speed this up, we want to make our distance function as fast as possible.
+
+For this example, let's pick the L2 distance. A simple Rust implementation looks like this:
+
+```rust
+pub fn l2_distance_simple(v1: &[f32], v2: &[f32]) -> f32 {
+    let mut sum: f32 = 0.0;
+
+    for (a,b) in v1.iter().zip(v2.iter()) {
+        sum += (a - b).powi(2)
+    }
+
+    sum.sqrt()
+}
+```
+
+`v1` and `v2` are the two vectors whose distance we want to calculate. In this case, they are defined as slices, because we don't care if the input is a Rust `Vec` or an array of f32 floats.
+
+This code is pretty simple, but there is one problem - the compiler cannot optimize it to use SIMD instructions.
+
+The main reason is that float addition is not associative - `(a + b) + c` is not guaranteed to equal `a + (b + c)` in float arithmetics, because, well, they are floats, and floats have precision issues, and whatnot. Floats may get rounded after an operation, so these two operations could produce different results - and the compiler knows that.
+
+The simple function we wrote above essentially does:
+
+```
+sum = (((0 + x1^2) + x2^2) + x3^2) + ...
+```
+
+Where `xi = a[i] - b[i]`. So if the compiler tried to optimize this in any way that changes the order of summation, then the result could change; hence, the compiler doesn't optimize.
+
+### SIMD
+
+SIMD stands for Single Instruction, Multiple Data and essentially allows us to run the same instruction over multiple data (duh).
+
+In SIMD logic, we would construct multiple sums in parallel. For example, with 4 partial sums, we would have something like:
+
+```
+sum1 = x0^2 + x4^2 + x8^2... 
+sum2 = x1^2 + x5^2 + x9^2...
+sum3 = x2^2 + x6^2 + x10^2...
+sum4 = x3^2 + x7^2 + x11^2... 
+```
+
+And then we would add all the partial sums to get the final result. This is how SIMD works, in a nutshell; you do the same operation, but split into multiple partial results, then aggregate them. And this example showcases why the compiler cannot automatically optimize (or vectorize, in this case) this code; the SIMD logic breaks down the problem using multiple lanes, which would change the order of operations.
+
+Now, in x86-64 processors, we usually find one of the following SIMD architectures:
+
+- SSE2 (the oldest in this list), which uses 128-bit registers. In our case, this allows us to do 4 sums in parallel (f32 uses 32 bits, so we can fit 4 single-precision floats in a single SSE2 register)
+- AVX2, which uses 256-bit registers, where we can do 8 sums in parallel
+- AVX-512, which you guessed it, uses 512-bit registers where we can do 16 sums in parallel
+
+There are more variations, but the point here is that different architectures have registers of different sizes.
+
+### Writing our own SIMD
+
+Since the compiler disappointed us, we'll roll our own SIMD code for the L2 distance. There are multiple ways to run SIMD code in Rust, with one of them being experimental ([std::simd - portable SIMD module](https://doc.rust-lang.org/std/simd/index.html)). We will be using what are called `intrinsics`, which are essentially a set of platform-specific functions that translate to SIMD instructions.
+
+We will be using the following functions from `std::arch::x86_64` (my CPU family type) targeting the AVX2 architecture:
+
+1. `_mm256_extractf128_ps` - extracts the last 128 bits from a 256-bit single-precision (hence the `ps` - it means `packed single`) array
+2. `_mm256_castps256_ps128` - "casts" a 256-bit array into a 128-bit array (will make more sense in the code)
+3. `_mm_add_ps` - adds two arrays element-wise 
+4. `_mm_hadd_ps` - horizontally adds two arrays
+5. `_mm256_setzero_ps` - returns a 256-bit array of 8 single precision floats, with all values set to zero, used to initialize an accumulator
+6. `_mm256_loadu_ps` - returns a 256-bit array of 8 single precision floats, whose values are taken from a given pointer (256-bits after pointer), used to load our vector values
+7. `_mm256_sub_ps` - subtracts two 256-bit arrays of single precision floats (essentially vectorizing the subtraction between 8 float pairs) and returns an array of 256-bits as the result
+8. `_mm256_fmadd_ps` - fused multiply-add, multiplies two 256-bit arrays (of 8 floats each) together, then adds the product to a third 256-bit array
+9. `_mm_cvtss_f32` - gets the first 32 bits (a single precision float) from the given array
+
+Since we have 256-bit arrays, we can essentially store 8 partial sums in them - as a single-precision float takes up 32 bits of memory.
+
+Below is the full code.
+
+```rust
+use std::arch::x86_64::*;
+
+#[target_feature(enable = "avx2,fma")]
+pub unsafe fn horizontal_sum_avx2(v: __m256) -> f32 {
+    // Extract the "last" 128 bits
+    let hi: __m128 = _mm256_extractf128_ps(v, 1);
+
+    // "Re-cast" the remaining "array" ("first" 128 bits) into a 128-bit "array"
+    let lo: __m128 = _mm256_castps256_ps128(v);
+
+    // Add the two "arrays" element-wise
+    let sum128: __m128 = _mm_add_ps(hi, lo);
+
+    // Instead of splitting again into "arrays", just add to self
+    // We have 4 values (4*32 = 128), a, b, c, d
+    // This produces [a + b, c + d, a + b, c + d]
+    let sum64: __m128 = _mm_hadd_ps(sum128, sum128);
+
+    // Again
+    // Given [a + b, c + d, a + b, c + d] this produces
+    // [a + b + c + d, a + b + c + d, a + b + c + d, a + b + c + d]
+    let sum32: __m128 = _mm_hadd_ps(sum64, sum64);
+
+    // Get first 32 bits (= a single f32) - essentially the sum
+    _mm_cvtss_f32(sum32)
+}
+
+
+#[target_feature(enable = "avx2,fma")]
+pub unsafe fn l2_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
+    // For AVX2, we have 8 lanes
+    let lanes: usize = 8;
+
+    // So split in lanes, then add remainder as scalar
+    let chunks = a.len() / lanes;
+
+    // Initialize an array of 8 floats, all set to 0 - these will be the partial sums
+    let mut acc = _mm256_setzero_ps();
+
+    for i in 0..chunks {
+        let offset: usize = i * lanes;
+
+        // Create array out of 8 floats of vector a
+        let a_buf = _mm256_loadu_ps(a.as_ptr().add(offset));
+        // Create array out of 8 floats of vector b
+        let b_buf = _mm256_loadu_ps(b.as_ptr().add(offset));
+
+        // Subtract the two arrays
+        // a_buf is [fa1, fa2, fa3, fa4, fa5, fa6, fa7, fa8]
+        // b_buf is [fb1, fb2, fb3, fb4, fb5, fb6, fb7, fb8]
+        // diff is [fa1-fb1, fa2-fb2, ..., fa8-fb8]
+        let diff = _mm256_sub_ps(a_buf, b_buf);
+
+        // Multiply the differences with themselves (= square) and add into acc
+        acc = _mm256_fmadd_ps(diff, diff, acc);
+
+    }
+    let mut sum = horizontal_sum_avx2(acc);
+
+    // Manually add in any remainder
+    for i in (chunks * lanes)..a.len() {
+        sum += (a[i] - b[i]).powi(2);
+    }
+
+    sum.sqrt()
+}
+```
+
+The code is pretty self-explanatory. The `l2_distance_avx2` function calculates the L2 distance. The `horizontal_sum_avx2` function takes the accumulator array (8 floats), and sums them all up to return a single f32.
+
+Two things worth noting here:
+- `#[target_feature(enable = "avx2,fma")]` - this tells the Rust compiler that it may use AVX2 and FMA (the fused-multiply-add we saw above) instructions when compiling this function
+- The functions are `unsafe`, because theoretically, this compiled code with AVX2 and FMA features can run on hardware that doesn't support them, so it will crash. It is up to us to decide when to call them.
+
+That's why the last piece of the puzzle is this code:
+
+```rust
+pub fn l2_distance_simple(v1: &[f32], v2: &[f32]) -> f32 {
+    let mut sum: f32 = 0.0;
+
+    for (a,b) in v1.iter().zip(v2.iter()) {
+        sum += (a - b).powi(2)
+    }
+
+    sum.sqrt()
+}
+
+
+pub fn l2_distance(v1: &[f32], v2: &[f32]) -> f32 {
+    let l2_dist: f32;
+
+    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+        unsafe {
+            l2_dist = l2_distance_avx2(v1, v2);
+        }
+    } else {
+        l2_dist = l2_distance_simple(v1, v2);
+    }
+
+    l2_dist
+}
+```
+
+`l2_distance` is the one we call - it finds out whether AVX2 and FMA are supported at runtime, and if so, it executes the SIMD implementation. Else, it executes the simple implementation we saw above. 
+
+Performance-wise, these two implementations are worlds apart. The simple one vectorizes nothing; the second one uses 8 lanes (again, 256-bits, which is 8 single precision floats), so each operation is vectorized to run on 8 different "pieces of data".
+
+Indeed, benchmarking the two implementations we find that when calculating the l2 distance of two vectors of 1024 dimensions 1.000.000 times, we see:
+
+- The simple implementation taking **888.8 ns/call**
+- Our AVX2 implementation taking **96.5 ns/call**
+
+Which is great! Our naive (as proven below) SIMD implementation is much faster. But can we do the same, ideally without writing platform-specific code?
+
+
+### Helping the compiler optimize using SIMD
+
+Of course we can. We don't always have to write SIMD by hand, at least not in this case. Going back, we saw that our code wasn't optimized by the compiler because it would have to rewrite our sequential addition loop, which would yield a different result since float addition is not associative.
+
+Thus, if we rewrite our code in a way that the associativity issue doesn't come up, we're good. 
+
+Going a bit deeper - what if we split into partial sums ourselves? That way the compiler can leverage SIMD, in exactly the same way that we did!
+
+And that's exactly what the compiler does. Here's the refactored code, no intrinsics:
+
+```rust
+fn l2_distance_chunked<const LANES: usize>(v1: &[f32], v2: &[f32]) -> f32 {
+    // Chunk into N chunks of size `LANES`
+    let v1_chunks = v1.chunks_exact(LANES);
+    let v2_chunks = v2.chunks_exact(LANES);
+
+    // Grab slices to the remainders
+    let (v1_remainder, v2_remainder) = (v1_chunks.remainder(), v2_chunks.remainder());
+
+    // Initialize an array of accumulators
+    let mut accumulators = [0.0f32; LANES];
+
+    // Iterate over the chunks in parallel
+    for (v1_chunk, v2_chunk) in v1_chunks.zip(v2_chunks) {
+        for lane in 0..LANES {
+            // Each chunk has `LANES` elements, so simply accumulate
+            accumulators[lane] += (v1_chunk[lane] - v2_chunk[lane]).powi(2);
+        }
+    }
+
+    let mut sum: f32 = 0.0;
+
+    // Add all the partial sums
+    for v in accumulators {
+        sum += v;
+    }
+
+    // Add in any remainder
+    for (v1_f, v2_f) in v1_remainder.iter().zip(v2_remainder.iter()) {
+        sum += (v1_f - v2_f).powi(2);
+    }
+
+    // Return
+    sum.sqrt()
+}
+```
+
+We define a generic function, where `LANES` is the number of partial sums we're gonna keep. We then split the input vectors in chunks (we assume they are the same size), grab slices of the remainders, and essentially do what SIMD would do - for each lane, diff then raise to the power of 2.
+
+Then we add the partial sums, add in any remainder, sqrt and we're done.
+
+Now we benchmark the 3 implementations - simple, manual SIMD, and chunked. The results are interesting:
+
+```
+dims = 1024, iters = 1000000
+Simple                        869.9 ns/call   result 13.102469
+AVX2 distance                  95.6 ns/call   result 13.102469
+Chunked, 8 lanes              114.9 ns/call   result 13.102469
+Chunked, 16 lanes              97.5 ns/call   result 13.10247
+Chunked, 32 lanes             112.8 ns/call   result 13.102469
+Chunked, 64 lanes             150.9 ns/call   result 13.102469
+```
+
+Note: each benchmark uses a different pair of random vectors, so results in following benchmarks will slightly vary.
+
+Key observations:
+
+1. Our 8-lanes run is faster than the simple implementation
+2. Our 8-lanes run is a bit slower than manually-written AVX2 implementation
+3. The 16-lanes run is on par with the manually-written AVX2 implementation
+4. Increasing the lanes any further worsens performance
+
+Let's unpack all of that.
+
+#### 8-lanes runs faster than the simple implementation
+
+This was kind of expected. We wrote new code in order to target specific optimizations (in this case, vectorization); so our code runs faster than the simple implementation.
+
+#### 8-lanes runs slower than manually-written AVX2
+
+The manually-written AVX2 code specifically instructs the compiler to use the AVX2 and FMA features when compiling. Our chunked implementation does not specify such a constraint.
+
+In this case, because we're compiling without specifying a target CPU version, the compiler targets all x86_64 CPUs; and in order to be compatible with all of them, it uses SSE2 SIMD instructions to optimize our code (which we can verify if we disassemble our binary and check the instructions). So, earlier architecture, less speed. Makes sense.
+
+#### 16-lanes run is on-par with AVX2
+
+Now that is surprising; the 16-lanes runs on-par with our AVX2 implementation, but how can that be? 
+
+The answer is a bit tricky. Our AVX2 implementation uses `fma`, which [takes 4 CPU cycles to complete](https://uops.info/table.html?search=fmadd&cb_lat=on&cb_tp=on&cb_uops=on&cb_ports=on&cb_CFL=on&cb_measurements=on&cb_doc=on&cb_fma=on). At the same time, my CPU (i7-8700k, Coffee Lake) has two FMA ports (refer to https://www.intel.com/content/www/us/en/content-details/671488/intel-64-and-ia-32-architectures-optimization-reference-manual-volume-1.html, page 69 - we're on Coffee Lake, but this it's an extension of Skylake, which we refer to).
+
+So, in other words, our manual implementation makes poor utilization of the CPU's resources, as we use a single accumulator. Each FMA op takes 4 cycles to produce a result, but the CPU can start a new one every cycle. With a single accumulator, we essentially wait for the whole FMA op to finish before we start another one, so there is some idleness there - our optimization yields only part of the performance that can be squeezed out of our CPU.
+
+On the other hand, the 16-lanes run is optimized by the compiler. It is not optimized for our own CPU, but for the general x86-64 family, so it uses SSE2 instead of AVX2. Even so, its optimizations seem to be better at using the CPU's resources efficiently - 16 lanes means 4 accumulators (as SSE2 has 128-bit-wide registers which can hold 4 single-precision floats and 16 lanes require 16 floats for partial sums), and even though it doesn't use FMA, the same concept of having in-flight ops applies.
+
+In the last section, we'll verify this theory, and make our AVX2 implementation faster.
+
+#### Increasing the lanes to anything more than 16 results in worse performance
+
+Again, this probably warrants a complicated technical answer. The simple answer is that there's some kind of bottleneck, which I would guess is in the code that does not get SIMD-optimized (e.g. the reduction we do, where we aggregate the partial sums), as well as the fact that we run out of registers after some number of lanes.
+
+Good enough for now :)
+
+### Leveraging AVX2 in the chunked case
+
+Now that we know that the chunked version is compiled with SSE rather than AVX2, we can force it to use AVX2 in one of two ways:
+
+1. Build with `-C target-cpu=native` - this tells the compiler to build for our specific CPU, so it will leverage the latest SIMD technology we support (in this case, AVX2 with FMA)
+2. Add `#[inline(always)]` in the chunked implementation, then add a wrapper function around our chunked implementation, and decorate it with `#[target_feature(enable = "avx2,fma")]`. Then, create a separate function that checks the availability of these features and calls the appropriate implementation. The inlining is required so that the wrapper contains the full code for the chunked implementation - if it was just calling the chunked implementation, there would be nothing to optimize in the wrapper's function body.
+
+The latter is the more flexible choice, since it means that we use AVX2 when available, else default to whatever SIMD the compiler used (which is based on the architecture we're targeting).
+
+For the sake of completeness, we also run a benchmark after compiling with `-C target-cpu=native` - in which case our chunked implementation uses AVX2. Here are the results:
+
+```
+dims = 1024, iters = 1000000
+Simple                        877.5 ns/call   result 13.454109
+AVX2 distance                  95.0 ns/call   result 13.454109
+Chunked, 8 lanes              103.9 ns/call   result 13.45411
+Chunked, 16 lanes              68.0 ns/call   result 13.454109
+Chunked, 32 lanes              79.3 ns/call   result 13.454109
+Chunked, 64 lanes             101.1 ns/call   result 13.454109
+```
+
+Now, the chunked-8-lanes implementation shouldn't be slower than AVX2, as it supposedly uses AVX2 as well. The delay can be attributed to the lack of FMA on the chunked version (the compiler's optimizer doesn't use it, as FMA rounds once instead of twice, hence changes the result) as well as the lack of vectorization for the horizontal sum.
+
+The 16-lanes run dominates again, which again hints towards better resource utilization. To fully understand this, we would need to disassemble and take a look at the actual code, which would turn this post into an essay and keep me awake for longer than I would like.
+
+Also, do note the result values; the 8-lanes implementation in this run outputs a different value than the rest. This is the associativity issue we discussed above; order of operation changes, hence we produce a slightly different result.
+
+### Making our own AVX2 implementation faster
+
+In the analysis of the results above, we theorised that our AVX2 implementation is slower because we don't utilize the CPU's FMA capabilities well enough. 
+
+So, to prove that, we're rewriting our AVX2 implementation to use multiple accumulators - like so:
+
+```rust
+#[target_feature(enable = "avx2,fma")]
+pub unsafe fn l2_distance_avx2<const ACCUMULATORS: usize>(a: &[f32], b: &[f32]) -> f32{
+    // For AVX2, we have 8 lanes
+    let lanes: usize = 8;
+
+    // So split in lanes, then add remainder as scalar
+    let chunks = a.len() / lanes;
+
+    // Initialize `ACCUMULATORS` arrays of 8 floats, all set to 0 - these will be the accumulators
+    let mut accumulator_arrays = [_mm256_setzero_ps(); ACCUMULATORS];
+
+    let chunks_end = chunks - (chunks % ACCUMULATORS);
+
+    for i in (0..chunks_end).step_by(accumulator_arrays.len()) {
+        for arr_idx in 0..ACCUMULATORS {
+            // For the first accumulator, take the first 8 floats (offset = 0);
+            // for the second one, the next 8 (offset = 8), and so on
+            let offset: usize = (i + arr_idx) * lanes;
+
+            // Create array out of 8 floats of vector a
+            let a_buf = _mm256_loadu_ps(a.as_ptr().add(offset));
+            // Create array out of 8 floats of vector b
+            let b_buf = _mm256_loadu_ps(b.as_ptr().add(offset));
+
+            // Subtract the two arrays
+            // a_buf is [fa1, fa2, fa3, fa4, fa5, fa6, fa7, fa8]
+            // b_buf is [fb1, fb2, fb3, fb4, fb5, fb6, fb7, fb8]
+            // diff is [fa1-fb1, fa2-fb2, ..., fa8-fb8]
+            let diff = _mm256_sub_ps(a_buf, b_buf);
+
+            // Multiply the differences with themselves (= square) and add into acc
+            accumulator_arrays[arr_idx] = _mm256_fmadd_ps(diff, diff, accumulator_arrays[arr_idx]);
+        }
+    }
+    let mut sum: f32 = 0.0;
+
+    for i in 0..ACCUMULATORS {
+        sum += horizontal_sum_avx2(accumulator_arrays[i]);
+    }
+
+    // Manually add in any remainder
+    for i in (chunks_end * lanes)..a.len() {
+        sum += (a[i] - b[i]).powi(2);
+    }
+
+    sum.sqrt()
+}
+```
+
+So, we're turning it into a generic function. The generic variable is the number of accumulators to use, and we simply iterate over them, calculate the appropriate offset, and aggregate the partial sums from each accumulator at the end, by calling `horizontal_sum_avx2` multiple times.
+
+Now, let's benchmark all of them once more, with `-C target-cpu=native` so that we compare the chunked implementation with AVX2 vs our own AVX2 implementation. Here are the results:
+
+```
+dims = 1024, iters = 1000000
+Simple                             873.3 ns/call   result 12.754383
+AVX2 distance, 1 accumulators       95.9 ns/call   result 12.754385
+AVX2 distance, 2 accumulators       56.4 ns/call   result 12.754385
+AVX2 distance, 4 accumulators       48.3 ns/call   result 12.754385
+AVX2 distance, 8 accumulators       48.9 ns/call   result 12.754385
+AVX2 distance, 16 accumulators      55.4 ns/call   result 12.754384
+AVX2 distance, 32 accumulators     115.7 ns/call   result 12.754387
+Chunked, 8 lanes                   103.5 ns/call   result 12.754385
+Chunked, 16 lanes                   67.7 ns/call   result 12.754385
+Chunked, 32 lanes                   74.4 ns/call   result 12.754385
+Chunked, 64 lanes                   98.7 ns/call   result 12.754385
+
+```
+
+Aha! That was it. Adding in accumulators helps, but performance peaks at 4. The reason is again, most probably the surrounding code that isn't optimized (e.g. the aggregations of the partial sums) and the `horizontal_sum_avx2` function that is being called sequentially. Optimizing that step could maybe take us a small step further.
+
+But why are we faster than the chunked version, even if it uses AVX2? That's because Rust's compiler doens't use FMA, as we stated above, since in this case we would still have the associativity issues. Ours does, hence the performance boost.
+
+## Conclusions
+
+In this post, we:
+
+1. Got a basic introduction to SIMD
+2. Wrote our own naive implementation
+3. Re-wrote our code so that the compiler can use SIMD instructions to optimize our code
+4. Identified the bottleneck and re-wrote our AVX2 implementation to be faster than the compiler's optimized version
+
+This was my intro to SIMD instructions and how we can write code that can be optimized by the compiler; a great learning experience, but only a small step into the lower-level intricacies of CPUs and optimization. 
+
+Low-level stuff like that is very interesting, but not easy to break into as it requires niche knowledge that can sometimes be hard to find.
+
+A few key takeaways:
+
+1. The compiler is smarter than me, and certainly smart enough to optimize using SIMD - we just need to learn how to write optimizable code.
+2. There are rules (like the associativity one) that we need to learn in order to be able to write optimizable code.
+3. Hand-rolled AVX2 implementations are cool, but require a lot of deep-diving to get right
+
+Note: AI coding models played a big part in this investigation, as they help do the grunt work; search for CPU specs, run targeted benchmarks to verify behaviour, help figure out what to read or target next, etc. While this post, the supplementary code and my HNSW implementation are not generated by AI, using it as a teaching assistant allowed me to get a better understanding of how these low-level things work without having to read up a hundred-page manual, or take a full course before proceeding with my work. 
+
+
+You can find the code for my HNSW implementation [on GitHub](https://github.com/adamantmc/rusty-hnsw).
