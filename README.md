@@ -14,7 +14,7 @@ Source code for my blog, built with [Astro](https://astro.build) and compiled to
 
 ## Developing
 
-Run `npm run dev` for a live-reloading dev server at http://localhost:4321/blog/.
+Run `npm run dev` for a live-reloading dev server at http://localhost:4321/.
 
 ## Writing a post
 

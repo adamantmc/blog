@@ -3,10 +3,9 @@ import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 
-// Served from GitHub Pages at https://adamantmc.github.io/blog/
+// Served from GitHub Pages at https://blog.adamantmc.gr/ (custom domain, see public/CNAME)
 export default defineConfig({
-  site: 'https://adamantmc.github.io',
-  base: '/blog',
+  site: 'https://blog.adamantmc.gr',
   trailingSlash: 'ignore',
   integrations: [mdx(), sitemap()],
   markdown: {
